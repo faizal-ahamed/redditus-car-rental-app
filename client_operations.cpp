@@ -183,15 +183,32 @@ void ClientOperations::NotReturned(const std::string& customerName) {
 
 
 void ClientOperations::returnCar(int carId) {
-    try {
-        sql::PreparedStatement* pstmt;
-        pstmt = conn->prepareStatement("UPDATE cars SET booked = FALSE WHERE id = ?");
-        pstmt->setInt(1, carId);
-        pstmt->execute();
+     try {
+        auto now = std::chrono::system_clock::now();
+        std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+        std::tm* localTime = std::localtime(&currentTime);
+        std::stringstream currentDateStream;
+        currentDateStream << std::put_time(localTime, "%Y-%m-%d");
+        std::string currentDate = currentDateStream.str();
 
-        std::cout << "Car with ID " << carId << " returned successfully.\n";
+        sql::PreparedStatement* checkTransactionsStmt = conn->prepareStatement("SELECT id FROM transactions WHERE car_id = ? AND eob >= ?");
+        checkTransactionsStmt->setInt(1, carId);
+        checkTransactionsStmt->setString(2, currentDate);
+        sql::ResultSet* checkTransactionsResult = checkTransactionsStmt->executeQuery();
 
-        delete pstmt;
+        if (!checkTransactionsResult->next()) {
+            sql::PreparedStatement* updateCarStmt = conn->prepareStatement("UPDATE cars SET booked = FALSE WHERE id = ?");
+            updateCarStmt->setInt(1, carId);
+            updateCarStmt->execute();
+            delete updateCarStmt;
+
+
+        } 
+
+          std::cout << "Car with ID " << carId<< " returned successfully.\n";
+
+        delete checkTransactionsResult;
+        delete checkTransactionsStmt;
     } catch (sql::SQLException& e) {
         std::cout << "SQL Error: " << e.what() << "\n";
     }
