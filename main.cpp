@@ -300,9 +300,10 @@ int main()
           cout<<"\t SET CLIENT USERNAME : ";          
           cin>>clientUsername;
           cout<<"\t SET CLIENT PASSWORD : ";          
-          cin>>clientPassword;
+          cin>>clientPassword; 
+          cin.ignore(numeric_limits<streamsize>::max(), '\n');
           cout<<"\t ENTER YOUR ADDRESS : ";          
-          getline(cin,address,'\n');
+          getline(cin,address);
           cout<<"\t ENTER YOUR PHONE NUMBER : ";          
           while (!(std::cin >> phnum)) {
                     std::cin.clear();
