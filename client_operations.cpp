@@ -161,7 +161,7 @@ void ClientOperations::NotReturned(const std::string& customerName) {
         sql::PreparedStatement* pstmt;
         sql::ResultSet* res;
 
-        pstmt = conn->prepareStatement("SELECT DISTINCT c.id, c.make, c.model, c.year FROM transactions t INNER JOIN cars c ON t.car_id = c.id WHERE t.customer_name = ? AND c.booked=TRUE AND t.eob >= ?");
+        pstmt = conn->prepareStatement("SELECT DISTINCT c.id, c.make, c.model, c.year FROM transactions t INNER JOIN cars c ON t.car_id = c.id WHERE t.customer_name = ? AND c.booked=TRUE AND t.eob <= ?");
         pstmt->setString(1, customerName);
         pstmt->setString(2, currentDate);
         res = pstmt->executeQuery();
@@ -243,8 +243,8 @@ void ClientOperations::displayClientTransactions(const std::string& clientUserna
             std::cout << "---------------------------------\n";
         }
 
-        delete res;
         delete pstmt;
+        delete res;
     } catch (sql::SQLException &e) {
         std::cout << "SQL Error: " << e.what() << std::endl;
     }

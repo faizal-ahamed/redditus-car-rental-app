@@ -10,6 +10,8 @@
 #include <chrono>
 #include <ctime>
 #include <iomanip>
+#include <string>
+#include  <bits/stdc++.h> 
 
 
 using namespace std;
@@ -133,7 +135,7 @@ int main()
   delete stmt2;
 
   sql::Statement* stmt1 = con->createStatement();
-  createTableQuery = "CREATE TABLE IF NOT EXISTS transactions (id INT AUTO_INCREMENT PRIMARY KEY,car_id INT,customer_name VARCHAR(50),dob DATE,eob DATE)";
+  createTableQuery = "CREATE TABLE IF NOT EXISTS transactions (id INT AUTO_INCREMENT PRIMARY KEY,car_id INT,customer_name VARCHAR(50),dob DATE,eob DATE,returnedstatus BOOLEAN default FALSE)";
   stmt1->execute(createTableQuery);
   delete stmt1;
 
@@ -300,9 +302,13 @@ int main()
           cout<<"\t SET CLIENT PASSWORD : ";          
           cin>>clientPassword;
           cout<<"\t ENTER YOUR ADDRESS : ";          
-          cin>>address;
+          getline(cin,address,'\n');
           cout<<"\t ENTER YOUR PHONE NUMBER : ";          
-          cin>>phnum;
+          while (!(std::cin >> phnum)) {
+                    std::cin.clear();
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    std::cout << "Invalid input. Please enter a valid integer: ";
+                    }
           cout<<"\n";
           csignUp(con, clientUsername, clientPassword, address ,phnum, false); // Sign up a client
       }
