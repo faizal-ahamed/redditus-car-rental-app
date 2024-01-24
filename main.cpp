@@ -1,11 +1,11 @@
 #include <iostream>
+#include "admin_operations.h"
+#include "client_operations.h"
 #include <mysql_connection.h>
 #include <mysql_driver.h>
 #include <mysql_error.h>
 #include <cppconn/prepared_statement.h>
 #include <cppconn/resultset.h>
-#include "admin_operations.h"
-#include "client_operations.h"
 #include <limits>
 #include <chrono>
 #include <ctime>
@@ -14,7 +14,9 @@
 #include  <bits/stdc++.h> 
 #include <termios.h>
 #include <unistd.h>
-
+#include <openssl/sha.h>
+#include <sstream>
+#include <openssl/evp.h>
 
 using namespace std;
 
@@ -32,9 +34,46 @@ sql::Connection* establishDBConnection()
   return con;
 }
 
-bool checkUsernameExists(sql::Connection* con, const std::string& username) {
+
+void disableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~(ECHO | ECHONL); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+void enableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= (ECHO | ECHONL); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+
+string sha256(const string& input) {
+    EVP_MD_CTX *ctx;
+    const EVP_MD *type = EVP_sha256();
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hashLen;
+
+    ctx = EVP_MD_CTX_new();
+    EVP_DigestInit(ctx, type);
+    EVP_DigestUpdate(ctx, input.c_str(), input.length());
+    EVP_DigestFinal(ctx, hash, &hashLen);
+
+    EVP_MD_CTX_free(ctx);
+    stringstream ss;
+    for(unsigned int i = 0; i < hashLen; i++) {
+        ss << hex << setw(2) << setfill('0') << (int)hash[i];
+    }
+
+    return ss.str();
+}
+
+
+bool checkUsernameExists(sql::Connection* con, const string& username) {
     try {
-        std::string query = "SELECT COUNT(*) FROM clients WHERE username = ?";
+        string query = "SELECT COUNT(*) FROM clients WHERE username = ?";
         sql::PreparedStatement* pstmt = con->prepareStatement(query);
         pstmt->setString(1, username);
         sql::ResultSet* resultSet = pstmt->executeQuery();
@@ -49,7 +88,7 @@ bool checkUsernameExists(sql::Connection* con, const std::string& username) {
         delete resultSet;
         delete pstmt;
     } catch (const sql::SQLException& e) {
-        std::cerr << "SQL Error: " << e.what() << "\n";
+        cerr << "SQL Error: " << e.what() << "\n";
     }
 
     return false;
@@ -76,7 +115,7 @@ try
  }
 }
 
-void csignUp(sql::Connection* con, const string& username, const string& password,const string& address,const int phonenum, bool isAdmin)
+void csignUp(sql::Connection* con, const string& username, const string& password,const string& address,const long long phonenum, bool isAdmin)
 {
 try
  {
@@ -86,7 +125,7 @@ try
     pstmt->setString(1, username);
     pstmt->setString(2, password);
     pstmt->setString(3, address);
-    pstmt->setInt(4,phonenum);
+    pstmt->setInt64(4,phonenum);
     pstmt->execute();
     cout << "USER SIGNED UP SUCCESSFULLY AS " << (isAdmin ? "admin" : "client") << "!" << endl;
     delete pstmt;
@@ -123,20 +162,6 @@ bool login(sql::Connection* con, const string& username, const string& password,
 }
 
 
-void disableEcho() {
-    struct termios tty;
-    tcgetattr(STDIN_FILENO, &tty);
-    tty.c_lflag &= ~(ECHO | ECHONL); 
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-}
-
-void enableEcho() {
-    struct termios tty;
-    tcgetattr(STDIN_FILENO, &tty);
-    tty.c_lflag |= (ECHO | ECHONL); 
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-}
-
 
 
 int main()
@@ -152,16 +177,16 @@ int main()
   cout << "                                  1. ADMIN                                      \n";
   cout << "                                  2. CUSTOMER                                   \n";
   cout << "\t ENTER YOUR ROLE : ";
-  while (!(std::cin >> role)) {
-    std::cin.clear();
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    std::cout << "Invalid input. Please enter a valid integer: ";
+  while (!(cin >> role)) {
+    cin.clear();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cout << "Invalid input. Please enter a valid integer: ";
 }
   cout<<endl;
   bool isAdminLoggedIn, isClientLoggedIn;
 
   sql::Statement* stmt = con->createStatement();
-  std::string createTableQuery = "CREATE TABLE IF NOT EXISTS cars (id INT AUTO_INCREMENT PRIMARY KEY, make VARCHAR(50), model VARCHAR(50), year INT,booked BOOLEAN default FALSE)";
+  string createTableQuery = "CREATE TABLE IF NOT EXISTS cars (id INT AUTO_INCREMENT PRIMARY KEY, make VARCHAR(50), model VARCHAR(50), year INT,booked BOOLEAN default FALSE)";
   stmt->execute(createTableQuery);
   delete stmt;
 
@@ -182,7 +207,7 @@ int main()
       cout << "                             ADMIN AUTHENTICATION                               \n";
       cout << "================================================================================\n";
       sql::Statement* stmt = con->createStatement();
-      std::string createTableQuery = "CREATE TABLE IF NOT EXISTS admins(username VARCHAR(50), password VARCHAR(50))";
+      string createTableQuery = "CREATE TABLE IF NOT EXISTS admins(username VARCHAR(50), password VARCHAR(65))";
       stmt->execute(createTableQuery);
       delete stmt;
       cout<<"\t ENTER ADMIN USERNAME : ";
@@ -194,12 +219,12 @@ int main()
 
     char c;
     while ((c = getchar()) != '\n') {
-        std::cout << '*';
+        cout << '*';
         adminPassword += c;  
     }
-
+    string adminHashedPassword = sha256(adminPassword);
     enableEcho();
-      isAdminLoggedIn = login(con, adminUsername, adminPassword, true);
+      isAdminLoggedIn = login(con, adminUsername, adminHashedPassword, true);
       if (isAdminLoggedIn)
       {
           cout << "\n                      ADMIN AUTHENTICATION SUCCESSFULL                          \n";
@@ -216,10 +241,10 @@ int main()
               cout<<"\t 5. POTENTIAL CARS APPROVAL/DENIAL"<<endl;
               cout<<"\t 6. EXIT"<<endl;
               cout<<"\t CHOOSE OPERATION : ";
-              while (!(std::cin >> choosevaradmin)) {
-                 std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cout << "Invalid input. Please enter a valid integer: ";
+              while (!(cin >> choosevaradmin)) {
+                 cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cout << "Invalid input. Please enter a valid integer: ";
             }
               cout <<endl;
 
@@ -237,10 +262,10 @@ int main()
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(std::cin >> year)) {
-                        std::cin.clear();
-                        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                        std::cout << "Invalid input. Please enter a valid integer: ";
+                      while (!(cin >> year)) {
+                        cin.clear();
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                        cout << "Invalid input. Please enter a valid integer: ";
                         }
                       cout<<endl;
                       Admin.addCar(make, model, year);
@@ -251,10 +276,10 @@ int main()
                       cout << "================================================================================\n";
                       Admin.showAvailableCars();
                       cout<<"\t ENTER CAR ID : ";
-                      while (!(std::cin >> carId)) {
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                    std::cout << "Invalid input. Please enter a valid integer: ";
+                      while (!(cin >> carId)) {
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    cout << "Invalid input. Please enter a valid integer: ";
                     }
                       cout<<endl;
                       Admin.removeCar(carId);
@@ -265,20 +290,20 @@ int main()
                       cout << "================================================================================\n";
                       Admin.showAvailableCars();
                       cout<<"\t ENTER CAR ID    : ";
-                      while (!(std::cin >> carId)) {
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                    std::cout << "Invalid input. Please enter a valid integer: ";
+                      while (!(cin >> carId)) {
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    cout << "Invalid input. Please enter a valid integer: ";
                     }
                       cout<<"\t ENTER CAR MAKE  : ";
                       cin>>make;
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(std::cin >> year)) {
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                    std::cout << "Invalid input. Please enter a valid integer: ";
+                      while (!(cin >> year)) {
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    cout << "Invalid input. Please enter a valid integer: ";
                     }
                       cout<<endl;
                       Admin.updateCar(carId, make, model, year);
@@ -320,18 +345,18 @@ int main()
       cout<<"\t 1. LOGIN"<<endl;
       cout<<"\t 2. SIGN UP"<<endl;
       cout<<"\t CHOOSE MODE :"<<endl;
-      while (!(std::cin >> log)) {
-      std::cin.clear();
-      std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-      std::cout << "Invalid input. Please enter a valid integer: ";
+      while (!(cin >> log)) {
+      cin.clear();
+      cin.ignore(numeric_limits<streamsize>::max(), '\n');
+      cout << "Invalid input. Please enter a valid integer: ";
       }
       cout<<"\n";
       sql::Statement* stmt = con->createStatement();
-      std::string createTableQuery = "CREATE TABLE IF NOT EXISTS clients(username VARCHAR(50), password VARCHAR(50), address VARCHAR(100), phonenum INT)";
+      string createTableQuery = "CREATE TABLE IF NOT EXISTS clients(username VARCHAR(50), password VARCHAR(65), address VARCHAR(100), phonenum BIGINT)";
       stmt->execute(createTableQuery);
       delete stmt;
-      std::string address;
-      int phnum;
+      string address;
+      long long phnum;
       if(log == 1)
       {
           cout<<"\t ENTER CLIENT USERNAME : ";          
@@ -342,20 +367,21 @@ int main()
 
     char c;
     while ((c = getchar()) != '\n') {
-        std::cout << '*';
+        cout << '*';
         clientPassword += c; 
     }
 
     enableEcho();
           cout<<"\n";
-          isClientLoggedIn = login(con, clientUsername, clientPassword, false);
+          string clientHashedPassword = sha256(clientPassword);
+          isClientLoggedIn = login(con, clientUsername, clientHashedPassword, false);
       }
 else {
     while (true) {
         cout << "\t SET CLIENT USERNAME : ";
         cin >> clientUsername;
         if (checkUsernameExists(con, clientUsername)) {
-            std::cout << "Username already exists. Choose a different username.\n";
+            cout << "Username already exists. Choose a different username.\n";
         } else {
             break; 
         }
@@ -364,20 +390,26 @@ else {
     cout << "\t SET CLIENT PASSWORD : ";
     cin >> clientPassword;
 
-    cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
     cout << "\t ENTER YOUR ADDRESS : ";
     getline(cin, address);
 
-    cout << "\t ENTER YOUR PHONE NUMBER : ";
-    while (!(std::cin >> phnum)) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << "Invalid input. Please enter a valid integer: ";
+while (true) {
+        cout << "\t ENTER YOUR PHONE NUMBER (10 digits): ";
+        if (!(cin >> phnum) || to_string(phnum).length() != 10) {
+            cout << "Invalid input. Please enter a 10-digit integer.\n";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        } else {
+            break; 
+        }
     }
 
+    cout<< phnum;
     cout << "\n";
-    csignUp(con, clientUsername, clientPassword, address, phnum, false); // Sign up a client
+    string clientHashedPassword = sha256(clientPassword);
+    csignUp(con, clientUsername, clientHashedPassword, address, phnum, false); // Sign up a client
 }
 
 
@@ -402,10 +434,10 @@ else {
           cout<<"\t 5. SEE ALL TRANSACTION MADE PRIOR"<<endl;
           cout<<"\t 6. EXIT"<<endl;
           cout<<"\t CHOOSE OPERATION : ";
-          while (!(std::cin >> choosevarclient)) {
-          std::cin.clear();
-          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-          std::cout << "Invalid input. Please enter a valid integer: ";
+          while (!(cin >> choosevarclient)) {
+          cin.clear();
+          cin.ignore(numeric_limits<streamsize>::max(), '\n');
+          cout << "Invalid input. Please enter a valid integer: ";
           }
           cout<<"\n";
           string make,model;
@@ -421,10 +453,10 @@ else {
                       
                   Client.showAvailableCars();
                   cout<<"\t ENTER CAR ID TO BE BOOKED : ";
-                  while (!(std::cin >> carId)) {
-                  std::cin.clear();
-                  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                  std::cout << "Invalid input. Please enter a valid integer: ";
+                  while (!(cin >> carId)) {
+                  cin.clear();
+                  cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                  cout << "Invalid input. Please enter a valid integer: ";
                   }
                   cout<<"\t ENTER START DATE OF BOOKING (YYYY-MM-DD) :";
                   cin>>dob;
@@ -445,10 +477,10 @@ else {
                       
                Client.NotReturned(clientUsername);
                   cout<<"\t ENTER CAR ID TO BE BOOKED : ";
-                  while (!(std::cin >> carId)) {
-                  std::cin.clear();
-                  std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                  std::cout << "Invalid input. Please enter a valid integer: ";
+                  while (!(cin >> carId)) {
+                  cin.clear();
+                  cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                  cout << "Invalid input. Please enter a valid integer: ";
                   }
                   Client.returnCar(carId);
                   break;
@@ -461,10 +493,10 @@ else {
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(std::cin >> year)) {
-                      std::cin.clear();
-                      std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                      std::cout << "Invalid input. Please enter a valid integer: ";
+                      while (!(cin >> year)) {
+                      cin.clear();
+                      cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                      cout << "Invalid input. Please enter a valid integer: ";
                       }
                       cout<<endl;
                       Client.postCarForRent( make, model,year);
