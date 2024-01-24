@@ -47,7 +47,7 @@ void ClientOperations::showAvailableCars() {
 
 
 
-void ClientOperations::bookCar(int carId, const std::string& customerName, const std::string& dob, const std::string& eob) {
+void ClientOperations::bookCar( const std::string& customerName) {
     try {
         auto now = std::chrono::system_clock::now();
         std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -55,6 +55,51 @@ void ClientOperations::bookCar(int carId, const std::string& customerName, const
         std::stringstream currentDateStream;
         currentDateStream << std::put_time(localTime, "%Y-%m-%d");
         std::string currentDate = currentDateStream.str();
+
+        
+
+        while (true) {
+    std::cout << "\t ENTER CAR ID TO BE BOOKED : ";
+    while (!(std::cin >> carId)) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Invalid input. Please enter a valid number: ";
+    }
+
+    sql::PreparedStatement* checkCarStmt = conn->prepareStatement("SELECT id FROM cars WHERE id = ?");
+    checkCarStmt->setInt(1, carId);
+    sql::ResultSet* checkCarResult = checkCarStmt->executeQuery();
+
+    if (checkCarResult->next()) {
+        break; 
+    } else {
+        std::cout << "\t CAR WITH ID " << carId << " DOES NOT EXIST." << std::endl;
+    }
+        
+
+        delete checkCarResult;
+        delete checkCarStmt;
+        }
+
+        while (true) {
+        std::cout << "\t ENTER START DATE OF BOOKING (YYYY-MM-DD) : ";
+        std::cin >> dob;
+        if (dob.length() == 10) {
+        break;  
+            } else {
+        std::cout << "\t Invalid input. Please enter a date in the format YYYY-MM-DD.\n";
+            }
+        }
+
+        while (true) {
+        std::cout << "\t ENTER END DATE OF BOOKING   (YYYY-MM-DD) : ";
+        std::cin >> eob;
+        if (eob.length() == 10) {
+            break;  
+            } else {
+        std::cout << "\t Invalid input. Please enter a date in the format YYYY-MM-DD.\n";
+        }
+    }
 
         if (dob < currentDate || eob < currentDate) {
             std::cout << "\t Date of Booking and End of Booking should be equal to or greater than the current date." << std::endl;
@@ -68,20 +113,7 @@ void ClientOperations::bookCar(int carId, const std::string& customerName, const
 
         conn->setAutoCommit(false);
 
-        sql::PreparedStatement* checkCarStmt = conn->prepareStatement("SELECT id FROM cars WHERE id = ?");
-        checkCarStmt->setInt(1, carId);
-        sql::ResultSet* checkCarResult = checkCarStmt->executeQuery();
-
-        if (!checkCarResult->next()) {
-            std::cout << "\t CAR WITH ID " << carId << " DOES NOT EXIST." << std::endl;
-            delete checkCarResult;
-            delete checkCarStmt;
-            conn->rollback();
-            return;
-        }
-
-        delete checkCarResult;
-        delete checkCarStmt;
+        
 
         sql::PreparedStatement* checkStmt = conn->prepareStatement("SELECT id FROM transactions WHERE car_id = ? AND ((dob <= ? AND eob >= ?) OR (dob <= ? AND eob >= ?) OR (dob >= ? AND eob <= ?))");
         checkStmt->setInt(1, carId);
@@ -148,7 +180,7 @@ void ClientOperations::bookCar(int carId, const std::string& customerName, const
 }
 
 
-void ClientOperations::NotReturned(const std::string& customerName) {
+int ClientOperations::NotReturned(const std::string& customerName) {
     try {
         auto now = std::chrono::system_clock::now();
         std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -161,7 +193,7 @@ void ClientOperations::NotReturned(const std::string& customerName) {
         sql::PreparedStatement* pstmt;
         sql::ResultSet* res;
 
-        pstmt = conn->prepareStatement("SELECT DISTINCT c.id, c.make, c.model, c.year FROM transactions t INNER JOIN cars c ON t.car_id = c.id WHERE t.customer_name = ? AND c.booked=TRUE AND t.eob <= ?");
+        pstmt = conn->prepareStatement("SELECT DISTINCT c.id, c.make, c.model, c.year FROM transactions t INNER JOIN cars c ON t.car_id = c.id WHERE t.customer_name = ? AND c.booked=TRUE AND t.eob <= ? AND returnedstatus=0");
         pstmt->setString(1, customerName);
         pstmt->setString(2, currentDate);
         res = pstmt->executeQuery();
@@ -169,20 +201,34 @@ void ClientOperations::NotReturned(const std::string& customerName) {
         std::cout << "Details of booked cars for customer '" << customerName << "' not returned:\n";
         std::cout << "Id\t" << "Make\t" << "Model\t" << "Year\t\n";
 
+        bool foundRecords = false;
+
         while (res->next()) {
+            foundRecords = true;
             std::cout << res->getInt("id") << "\t" << res->getString("make") << "\t" << res->getString("model") << "\t" << res->getInt("year") << "\n";
+        }
+
+        if (!foundRecords) {
+            std::cout << "No not returned cars found for customer '" << customerName << "'.\n";
         }
 
         std::cout << "\n";
         delete res;
         delete pstmt;
+        int r=0;
+    if(foundRecords)
+    r=1;
+    return r;
     } catch (sql::SQLException& e) {
         std::cout << "SQL Error: " << e.what() << "\n";
     }
+    return 0;
+    
 }
 
 
-void ClientOperations::returnCar(int carId) {
+
+void ClientOperations::returnCar(const std::string& customerName) {
      try {
         auto now = std::chrono::system_clock::now();
         std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -191,21 +237,56 @@ void ClientOperations::returnCar(int carId) {
         currentDateStream << std::put_time(localTime, "%Y-%m-%d");
         std::string currentDate = currentDateStream.str();
 
-        sql::PreparedStatement* checkTransactionsStmt = conn->prepareStatement("SELECT id FROM transactions WHERE car_id = ? AND eob >= ?");
-        checkTransactionsStmt->setInt(1, carId);
-        checkTransactionsStmt->setString(2, currentDate);
+        int carIdToBeReturned;
+        std::cout<<"\t ENTER CAR ID TO BE RETURNED : ";
+        while (!(std::cin >> carIdToBeReturned)) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Invalid input. Please enter a valid number: ";
+        }
+
+
+
+        sql::PreparedStatement* checkCarBookingStmt = conn->prepareStatement("SELECT id FROM transactions WHERE car_id = ? AND customer_name = ? AND eob <= ?");
+        checkCarBookingStmt->setInt(1, carIdToBeReturned);
+        checkCarBookingStmt->setString(2, customerName);
+        checkCarBookingStmt->setString(3, currentDate);
+        sql::ResultSet* checkCarBookingResult = checkCarBookingStmt->executeQuery();
+
+
+        if (!checkCarBookingResult->next()) {
+            std::cout << "You have not booked car with ID " << carIdToBeReturned << ". Cannot return the car.\n";
+            delete checkCarBookingResult;
+            delete checkCarBookingStmt;
+            return;
+        }
+
+        delete checkCarBookingResult;
+        delete checkCarBookingStmt;
+
+
+        sql::PreparedStatement* changeTransactionsStmt = conn->prepareStatement("UPDATE transactions SET returnedstatus = 1 WHERE car_id = ? AND eob <= ? AND customer_name=?");
+        changeTransactionsStmt->setInt(1, carIdToBeReturned);
+        changeTransactionsStmt->setString(2, currentDate);
+        changeTransactionsStmt->setString(3, customerName);
+        sql::ResultSet* changeTransactionsResult = changeTransactionsStmt->executeQuery();
+        
+        
+        
+        sql::PreparedStatement* checkTransactionsStmt = conn->prepareStatement("SELECT id FROM transactions WHERE car_id = ? AND returnedstatus = 0");
+        checkTransactionsStmt->setInt(1, carIdToBeReturned);
         sql::ResultSet* checkTransactionsResult = checkTransactionsStmt->executeQuery();
 
         if (!checkTransactionsResult->next()) {
             sql::PreparedStatement* updateCarStmt = conn->prepareStatement("UPDATE cars SET booked = FALSE WHERE id = ?");
-            updateCarStmt->setInt(1, carId);
+            updateCarStmt->setInt(1, carIdToBeReturned);
             updateCarStmt->execute();
             delete updateCarStmt;
 
 
         } 
 
-          std::cout << "Car with ID " << carId<< " returned successfully.\n";
+          std::cout << "Car with ID " << carIdToBeReturned<< " returned successfully.\n";
 
         delete checkTransactionsResult;
         delete checkTransactionsStmt;
@@ -225,7 +306,6 @@ void ClientOperations::postCarForRent(const std::string& make, const std::string
 
         std::cout << "Car posted for renting successfully." << std::endl;
 
-        // Clean up
         delete pstmt;
     } catch (sql::SQLException& e) {
         std::cout << "SQL Error: " << e.what() << std::endl;
@@ -240,12 +320,10 @@ void ClientOperations::displayClientTransactions(const std::string& clientUserna
         sql::PreparedStatement* pstmt;
         sql::ResultSet* res;
 
-        // Prepare SQL statement to retrieve transactions for the given client
         pstmt = conn->prepareStatement("SELECT c.id, c.make, c.model, c.year,t.dob,t.eob FROM transactions t INNER JOIN cars c ON t.car_id = c.id WHERE t.customer_name = ?");
         pstmt->setString(1, clientUsername);
         res = pstmt->executeQuery();
 
-        // Display the transactions
         std::cout << "================================================================================\n";
         std::cout << "                     TRANSACTIONS FOR CLIENT: " << clientUsername << "                     \n";
         std::cout << "================================================================================\n";

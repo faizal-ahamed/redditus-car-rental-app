@@ -180,7 +180,7 @@ int main()
   while (!(cin >> role)) {
     cin.clear();
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cout << "Invalid input. Please enter a valid integer: ";
+    cout << "Invalid input. Please enter a valid number: ";
 }
   cout<<endl;
   bool isAdminLoggedIn, isClientLoggedIn;
@@ -199,6 +199,11 @@ int main()
   createTableQuery = "CREATE TABLE IF NOT EXISTS transactions (id INT AUTO_INCREMENT PRIMARY KEY,car_id INT,customer_name VARCHAR(50),dob DATE,eob DATE,returnedstatus BOOLEAN default FALSE)";
   stmt1->execute(createTableQuery);
   delete stmt1;
+
+  auto now = chrono::system_clock::now();
+    time_t currentTime = chrono::system_clock::to_time_t(now);
+    tm* localTime = localtime(&currentTime);
+    int currentYear = localTime->tm_year + 1900;
 
   string adminUsername , adminPassword , clientUsername ,clientPassword;
 
@@ -244,7 +249,7 @@ int main()
               while (!(cin >> choosevaradmin)) {
                  cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                cout << "Invalid input. Please enter a valid integer: ";
+                cout << "Invalid input. Please enter a valid number: ";
             }
               cout <<endl;
 
@@ -262,11 +267,16 @@ int main()
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(cin >> year)) {
-                        cin.clear();
-                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                        cout << "Invalid input. Please enter a valid integer: ";
-                        }
+                      while (!(cin >> year) || year > currentYear) {
+                      cin.clear();
+                      cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        
+                      if (year > currentYear) {
+                      cout << "Invalid input. The car's model year cannot be in the future. Please enter a valid year: ";
+                      } else {
+                      cout << "Invalid input. Please enter a valid number: ";
+                      }
+                    }
                       cout<<endl;
                       Admin.addCar(make, model, year);
                   break;
@@ -279,7 +289,7 @@ int main()
                       while (!(cin >> carId)) {
                     cin.clear();
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    cout << "Invalid input. Please enter a valid integer: ";
+                    cout << "Invalid input. Please enter a valid number: ";
                     }
                       cout<<endl;
                       Admin.removeCar(carId);
@@ -293,18 +303,23 @@ int main()
                       while (!(cin >> carId)) {
                     cin.clear();
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    cout << "Invalid input. Please enter a valid integer: ";
+                    cout << "Invalid input. Please enter a valid number: ";
                     }
                       cout<<"\t ENTER CAR MAKE  : ";
                       cin>>make;
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(cin >> year)) {
-                    cin.clear();
-                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                    cout << "Invalid input. Please enter a valid integer: ";
-                    }
+                      while (!(cin >> year) || year > currentYear) {
+                      cin.clear();
+                      cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        
+                      if (year > currentYear) {
+                      cout << "Invalid input. The car's model year cannot be in the future. Please enter a valid year: ";
+                      } else {
+                      cout << "Invalid input. Please enter a valid number: ";
+                      }
+                      }
                       cout<<endl;
                       Admin.updateCar(carId, make, model, year);
                   break;
@@ -348,7 +363,7 @@ int main()
       while (!(cin >> log)) {
       cin.clear();
       cin.ignore(numeric_limits<streamsize>::max(), '\n');
-      cout << "Invalid input. Please enter a valid integer: ";
+      cout << "Invalid input. Please enter a valid number: ";
       }
       cout<<"\n";
       sql::Statement* stmt = con->createStatement();
@@ -398,7 +413,7 @@ else {
 while (true) {
         cout << "\t ENTER YOUR PHONE NUMBER (10 digits): ";
         if (!(cin >> phnum) || to_string(phnum).length() != 10) {
-            cout << "Invalid input. Please enter a 10-digit integer.\n";
+            cout << "Invalid input. Please enter a 10-digit number.\n";
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
         } else {
@@ -437,12 +452,13 @@ while (true) {
           while (!(cin >> choosevarclient)) {
           cin.clear();
           cin.ignore(numeric_limits<streamsize>::max(), '\n');
-          cout << "Invalid input. Please enter a valid integer: ";
+          cout << "Invalid input. Please enter a valid number: ";
           }
           cout<<"\n";
           string make,model;
           int year;
           int carId;
+          int returnstatus;
           string dob,eob;
           switch(choosevarclient)
           {
@@ -452,38 +468,29 @@ while (true) {
                       cout << "================================================================================\n";
                       
                   Client.showAvailableCars();
-                  cout<<"\t ENTER CAR ID TO BE BOOKED : ";
-                  while (!(cin >> carId)) {
-                  cin.clear();
-                  cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                  cout << "Invalid input. Please enter a valid integer: ";
-                  }
-                  cout<<"\t ENTER START DATE OF BOOKING (YYYY-MM-DD) :";
-                  cin>>dob;
-                  cout<<"\t ENTER END DATE OF BOOKING   (YYYY-MM-DD) :";
-                  cin>>eob;
-                  Client.bookCar(carId, clientUsername,dob,eob);
+
+
+                  Client.bookCar(clientUsername);
+                  
                   break;
               case 2: 
                       cout << "================================================================================\n";
                       cout << "\n                NOT RETURNED CAR DETAILS                          \n";
                       cout << "================================================================================\n";
                       
-              Client.NotReturned(clientUsername);
+                    returnstatus=Client.NotReturned(clientUsername);
                   break;
               case 3: cout << "================================================================================\n";
                       cout << "\n                     RETURN A CAR                           \n";
                       cout << "================================================================================\n";
                       
-               Client.NotReturned(clientUsername);
-                  cout<<"\t ENTER CAR ID TO BE BOOKED : ";
-                  while (!(cin >> carId)) {
-                  cin.clear();
-                  cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                  cout << "Invalid input. Please enter a valid integer: ";
-                  }
-                  Client.returnCar(carId);
-                  break;
+               returnstatus=Client.NotReturned(clientUsername);
+               if(returnstatus==1){
+                  
+                  Client.returnCar(clientUsername);
+                  
+               }
+               break;
               case 4:
                   cout << "================================================================================\n";
                       cout << "\n                      ENTER CAR DETAILS FOR POST                         \n";
@@ -493,10 +500,15 @@ while (true) {
                       cout<<"\t ENTER CAR MODEL : ";
                       cin>>model;
                       cout<<"\t ENTER CAR YEAR  : ";
-                      while (!(cin >> year)) {
+                      while (!(cin >> year) || year > currentYear) {
                       cin.clear();
                       cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                      cout << "Invalid input. Please enter a valid integer: ";
+        
+                      if (year > currentYear) {
+                        cout << "Invalid input. The car's model year cannot be in the future. Please enter a valid year: ";
+                      } else {
+                        cout << "Invalid input. Please enter a valid number: ";
+                      }
                       }
                       cout<<endl;
                       Client.postCarForRent( make, model,year);
@@ -514,7 +526,7 @@ while (true) {
   }
   else
   {
-          cout << "================================================================================\n";
+          cout << "\n================================================================================\n";
           cout << "\n                        CLIENT AUTHENTICATION FAILED                           \n";
           cout << "================================================================================\n";
   }
