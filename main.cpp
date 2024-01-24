@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <string>
 #include  <bits/stdc++.h> 
+#include <termios.h>
+#include <unistd.h>
 
 
 using namespace std;
@@ -30,6 +32,28 @@ sql::Connection* establishDBConnection()
   return con;
 }
 
+bool checkUsernameExists(sql::Connection* con, const std::string& username) {
+    try {
+        std::string query = "SELECT COUNT(*) FROM clients WHERE username = ?";
+        sql::PreparedStatement* pstmt = con->prepareStatement(query);
+        pstmt->setString(1, username);
+        sql::ResultSet* resultSet = pstmt->executeQuery();
+
+        if (resultSet->next()) {
+            int count = resultSet->getInt(1);
+            delete resultSet;
+            delete pstmt;
+            return count > 0;
+        }
+
+        delete resultSet;
+        delete pstmt;
+    } catch (const sql::SQLException& e) {
+        std::cerr << "SQL Error: " << e.what() << "\n";
+    }
+
+    return false;
+}
 
 
 
@@ -99,7 +123,19 @@ bool login(sql::Connection* con, const string& username, const string& password,
 }
 
 
+void disableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~(ECHO | ECHONL); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
 
+void enableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= (ECHO | ECHONL); 
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
 
 
 
@@ -151,8 +187,18 @@ int main()
       delete stmt;
       cout<<"\t ENTER ADMIN USERNAME : ";
       cin>>adminUsername;
+      
       cout<<"\n\t ENTER ADMIN PASSWORD : ";
-      cin>>adminPassword;
+       cin.ignore(numeric_limits<streamsize>::max(), '\n');
+       disableEcho();
+
+    char c;
+    while ((c = getchar()) != '\n') {
+        std::cout << '*';
+        adminPassword += c;  
+    }
+
+    enableEcho();
       isAdminLoggedIn = login(con, adminUsername, adminPassword, true);
       if (isAdminLoggedIn)
       {
@@ -291,28 +337,54 @@ int main()
           cout<<"\t ENTER CLIENT USERNAME : ";          
           cin>>clientUsername;
           cout<<"\t ENTER CLIENT PASSWORD : ";          
-          cin>>clientPassword;
+          cin.ignore(numeric_limits<streamsize>::max(), '\n');
+       disableEcho();
+
+    char c;
+    while ((c = getchar()) != '\n') {
+        std::cout << '*';
+        clientPassword += c; 
+    }
+
+    enableEcho();
           cout<<"\n";
           isClientLoggedIn = login(con, clientUsername, clientPassword, false);
       }
-      else
-      {
-          cout<<"\t SET CLIENT USERNAME : ";          
-          cin>>clientUsername;
-          cout<<"\t SET CLIENT PASSWORD : ";          
-          cin>>clientPassword; 
-          cin.ignore(numeric_limits<streamsize>::max(), '\n');
-          cout<<"\t ENTER YOUR ADDRESS : ";          
-          getline(cin,address);
-          cout<<"\t ENTER YOUR PHONE NUMBER : ";          
-          while (!(std::cin >> phnum)) {
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                    std::cout << "Invalid input. Please enter a valid integer: ";
-                    }
-          cout<<"\n";
-          csignUp(con, clientUsername, clientPassword, address ,phnum, false); // Sign up a client
-      }
+else {
+    while (true) {
+        cout << "\t SET CLIENT USERNAME : ";
+        cin >> clientUsername;
+        if (checkUsernameExists(con, clientUsername)) {
+            std::cout << "Username already exists. Choose a different username.\n";
+        } else {
+            break; 
+        }
+    }
+
+    cout << "\t SET CLIENT PASSWORD : ";
+    cin >> clientPassword;
+
+    cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+    cout << "\t ENTER YOUR ADDRESS : ";
+    getline(cin, address);
+
+    cout << "\t ENTER YOUR PHONE NUMBER : ";
+    while (!(std::cin >> phnum)) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Invalid input. Please enter a valid integer: ";
+    }
+
+    cout << "\n";
+    csignUp(con, clientUsername, clientPassword, address, phnum, false); // Sign up a client
+}
+
+
+
+
+
+
 
       if (isClientLoggedIn) {
        cout << "================================================================================\n";
