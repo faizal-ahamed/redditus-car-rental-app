@@ -10,8 +10,8 @@
 #include <chrono>
 #include <ctime>
 #include <iomanip>
-#include <string>
-#include  <bits/stdc++.h> 
+#include <termios.h>
+#include <unistd.h>
 
 
 using namespace std;
@@ -99,6 +99,39 @@ bool login(sql::Connection* con, const string& username, const string& password,
 }
 
 
+//Disable and enable echo for protected password entry
+
+void disableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+void enableEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+
+
+
+// void disableEcho() {
+//     struct termios tty;
+//     tcgetattr(STDIN_FILENO, &tty);
+//     tty.c_lflag &= ~(ECHO | ECHONL);  // Disable echoing
+//     tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+// }
+
+// void enableEcho() {
+//     struct termios tty;
+//     tcgetattr(STDIN_FILENO, &tty);
+//     tty.c_lflag |= (ECHO | ECHONL);  // Enable echoing
+//     tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+// }
+
+
 
 
 
@@ -135,7 +168,7 @@ int main()
   delete stmt2;
 
   sql::Statement* stmt1 = con->createStatement();
-  createTableQuery = "CREATE TABLE IF NOT EXISTS transactions (id INT AUTO_INCREMENT PRIMARY KEY,car_id INT,customer_name VARCHAR(50),dob DATE,eob DATE,returnedstatus BOOLEAN default FALSE)";
+  createTableQuery = "CREATE TABLE IF NOT EXISTS transactions (id INT AUTO_INCREMENT PRIMARY KEY,car_id INT,customer_name VARCHAR(50),dob DATE,eob DATE)";
   stmt1->execute(createTableQuery);
   delete stmt1;
 
@@ -152,7 +185,13 @@ int main()
       cout<<"\t ENTER ADMIN USERNAME : ";
       cin>>adminUsername;
       cout<<"\n\t ENTER ADMIN PASSWORD : ";
-      cin>>adminPassword;
+     disableEcho();
+     char c;
+     while (std::cin.get(c) && c != '\n') {
+        std::cout << '*';
+        adminPassword += c;  // Collect the characters for later use if needed
+    }
+    enableEcho();
       isAdminLoggedIn = login(con, adminUsername, adminPassword, true);
       if (isAdminLoggedIn)
       {
@@ -290,8 +329,10 @@ int main()
       {
           cout<<"\t ENTER CLIENT USERNAME : ";          
           cin>>clientUsername;
-          cout<<"\t ENTER CLIENT PASSWORD : ";          
+          cout<<"\t ENTER CLIENT PASSWORD : ";     
+          disableEcho();
           cin>>clientPassword;
+          enableEcho();
           cout<<"\n";
           isClientLoggedIn = login(con, clientUsername, clientPassword, false);
       }
@@ -300,16 +341,12 @@ int main()
           cout<<"\t SET CLIENT USERNAME : ";          
           cin>>clientUsername;
           cout<<"\t SET CLIENT PASSWORD : ";          
-          cin>>clientPassword; 
+          cin>>clientPassword;
           cin.ignore(numeric_limits<streamsize>::max(), '\n');
           cout<<"\t ENTER YOUR ADDRESS : ";          
-          getline(cin,address);
+          getline(cin, address);
           cout<<"\t ENTER YOUR PHONE NUMBER : ";          
-          while (!(std::cin >> phnum)) {
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                    std::cout << "Invalid input. Please enter a valid integer: ";
-                    }
+          cin>>phnum;
           cout<<"\n";
           csignUp(con, clientUsername, clientPassword, address ,phnum, false); // Sign up a client
       }
@@ -426,5 +463,4 @@ int main()
   delete con;
   return 0;
 }
-
 
