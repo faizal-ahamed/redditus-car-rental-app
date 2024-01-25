@@ -12,10 +12,20 @@ ClientOperations::ClientOperations(sql::Connection* connection) : conn(connectio
 
 void ClientOperations::showAvailableCars() {
     try {
+
+        auto now = std::chrono::system_clock::now();
+        std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+        std::tm* localTime = std::localtime(&currentTime);
+        std::stringstream currentDateStream;
+        currentDateStream << std::put_time(localTime, "%Y-%m-%d");
+        std::string currentDate = currentDateStream.str();
+
+
         sql::PreparedStatement* pstmt;
         sql::ResultSet* res;
 
-        pstmt = conn->prepareStatement("SELECT cars.id, cars.make, cars.model, cars.year, cars.booked, transactions.dob, transactions.eob FROM cars LEFT JOIN transactions ON cars.id = transactions.car_id");
+        pstmt = conn->prepareStatement("SELECT cars.id, cars.make, cars.model, cars.year, cars.booked, transactions.dob, transactions.eob FROM cars LEFT JOIN transactions ON cars.id = transactions.car_id AND transactions.eob > ?");
+pstmt->setString(1, currentDate);
         res = pstmt->executeQuery();
 
         std::cout << "\n                  CARS DETAILS                         \n";
