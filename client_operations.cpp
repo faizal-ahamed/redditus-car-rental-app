@@ -34,8 +34,8 @@ void ClientOperations::showAvailableCars() {
                       << model << "\t"
                       << year << "\t"
                       << (isBooked ? "TRUE" : "FALSE") << "\t"
-                      << (isBooked ? (dob.empty() ? "N/A" : dob) : "N/A") << "\t"
-                      << (isBooked ? (eob.empty() ? "N/A" : eob) : "N/A") << std::endl;
+                      << (isBooked ? (dob.empty() ? "NIL" : dob) : "NIL") << "\t"
+                      << (isBooked ? (eob.empty() ? "NIL" : eob) : "NIL") << std::endl;
         }
 
         delete res;
