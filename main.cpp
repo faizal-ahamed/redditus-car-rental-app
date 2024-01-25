@@ -421,7 +421,7 @@ while (true) {
         }
     }
 
-    cout<< phnum;
+
     cout << "\n";
     string clientHashedPassword = sha256(clientPassword);
     csignUp(con, clientUsername, clientHashedPassword, address, phnum, false); // Sign up a client
